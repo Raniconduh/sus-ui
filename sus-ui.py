@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 import curses
 import socket
 import json
@@ -166,15 +168,17 @@ def main(screen):
 
     max_height, max_width = screen.getmaxyx()
 
+    # set getch() to non-blocking
     screen.timeout(0)
     
     inpline = ""
 
+    screen.erase()
+
     # chat
     while True:
-        screen.erase()
-
         mov_curs_flag = False
+        clear_flag = False
 
         if line := readline(s):
             line = json.loads(line)
@@ -201,6 +205,8 @@ def main(screen):
 
                 chat_buf.append(f'[you]: {inpline}')
                 inpline = ""
+
+                clear_flag = True
             elif c == ord('\b') or c == 127:
                 inpline = inpline[:-1]
                 mov_curs_flag = True
@@ -209,6 +215,10 @@ def main(screen):
 
         if len(chat_buf) == max_height - 3:
             chat_buf = chat_buf[1:]
+            clear_flag = True
+
+        if clear_flag:
+            screen.erase()
 
         # print chat buffer to screen
         for line in range(len(chat_buf)):
