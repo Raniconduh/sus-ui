@@ -16,7 +16,7 @@ def readall(s):
 
 # read single line in socket
 def readline(s):
-    s.settimeout(0.1)
+    s.settimeout(0.005)
     buf = ''
     try:
         while c := s.recv(1):
@@ -182,10 +182,10 @@ def main(screen):
                 sender = line["arguments"]["player"]
                 msg = line["arguments"]["message"]
                 chat_buf.append(f'[{sender}]: {msg}')
-            if line["type"] == "join":
+            elif line["type"] == "join":
                 player = line["arguments"]["player"]
                 chat_buf.append(f'[{player} joined the lobby]')
-            if line["type"] == "leave":
+            elif line["type"] == "leave":
                 player = line["arguments"]["player"]
                 chat_buf.append(f'[{player} left the lobby]')
             else:
