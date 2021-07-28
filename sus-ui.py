@@ -175,6 +175,8 @@ def main(screen):
 
     screen.erase()
 
+    read_next = 0
+
     # chat
     while True:
         mov_curs_flag = False
@@ -196,22 +198,28 @@ def main(screen):
                 chat_buf.append(f'**Unknown server response** [{line["type"]}]')
 
         # handle inputs
-        if (c := screen.getch()) != -1:
-            if c == ord('\n'):
-                new_msg = {"type":"message", "arguments":{"message":inpline}}
+        if (c := screen.getch()) != -1 and not read_next:
+            if c == ord('\n') and inpline.strip():
+                new_msg = {"type":"message","arguments":{"message":inpline}}
                 new_msg = json.dumps(new_msg)
-
                 s.send(new_msg.encode('utf-8'))
 
                 chat_buf.append(f'[you]: {inpline}')
                 inpline = ""
 
                 clear_flag = True
-            elif c == ord('\b') or c == 127:
+            elif c == ord('\n') and not inpline.strip():
+                y, x = screen.getyx()
+                screen.move(y - 1, x)
+            elif c == ord('\b') or c == 127: # DEL
                 inpline = inpline[:-1]
                 mov_curs_flag = True
+            elif c == 27: # ESC
+                read_next = 3
             else:
                 inpline += chr(c)
+
+        if read_next: read_next -= 1
 
         if len(chat_buf) == max_height - 3:
             chat_buf = chat_buf[1:]
