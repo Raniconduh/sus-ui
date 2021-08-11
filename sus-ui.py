@@ -170,12 +170,18 @@ def main(screen):
 
     # set getch() to non-blocking
     screen.timeout(0)
-    
+
     inpline = ""
-
     screen.erase()
-
     read_next = 0
+    game_play = False
+    CREW = (0)
+    IMP = (1)
+    GHOST = (2)
+    player_types = ("crewmate", "imposter", "ghost")
+    player_type = None
+    location = None
+    doors = []
 
     # chat
     while True:
@@ -194,19 +200,47 @@ def main(screen):
             elif line["type"] == "leave":
                 player = line["arguments"]["player"]
                 chat_buf.append(f'[{player} left the lobby]')
+            elif line["type"] == "game_status":
+                if line["status"] == 0:
+                    game_play = True
+                    new_com = {"type":"location"}
+                    s.send(json.dumps(new_com).encode('utf-8'))
+            elif line["type"] == "player_type":
+                player_type = int(line["status"])
+                tmp_type = player_types[player_type]
+                chat_buf.append(f'[You are {"an" if player_type == 1 else "a"} {tmp_type}]')
+            elif line["type"] == "location" and line["status"] == 1:
+                location = line["arguments"]["name"]
+                doors = [door for door in line["arguments"]["doors"]]
+            elif line["type"] == "set_location":
+                pass
             else:
                 chat_buf.append(f'**Unknown server response** [{line["type"]}]')
 
         # handle inputs
         if (c := screen.getch()) != -1 and not read_next:
             if c == ord('\n') and inpline.strip():
-                new_msg = {"type":"message","arguments":{"message":inpline}}
-                new_msg = json.dumps(new_msg)
-                s.send(new_msg.encode('utf-8'))
+                if inpline == '/start':
+                    new_com = {"type":"command","arguments":{"command":"start","arguments":[]}}
+                    s.send(json.dumps(new_com).encode('utf-8'))
+                elif inpline == '/location':
+                    new_com = {"type":"location"}
+                    s.send(json.dumps(new_com).encode('utf-8'))
+                elif inpline.split(' ')[0] == '/go' and len(inpline.split(' ')) == 2:
+                    i = inpline.split(' ')
+                    new_com = {"type":"set_location","arguments":{"name":i[1]}}
+                    s.send(json.dumps(new_com).encode('utf-8'))
+                    
+                    new_com = {"type":"location"}
+                    s.send(json.dumps(new_com).encode('utf-8'))
+                elif not game_play:
+                    new_msg = {"type":"message","arguments":{"message":inpline}}
+                    new_msg = json.dumps(new_msg)
+                    s.send(new_msg.encode('utf-8'))
 
-                chat_buf.append(f'[you]: {inpline}')
+                    chat_buf.append(f'[you]: {inpline}')
+
                 inpline = ""
-
                 clear_flag = True
             elif c == ord('\n') and not inpline.strip():
                 y, x = screen.getyx()
@@ -230,7 +264,13 @@ def main(screen):
 
         # print chat buffer to screen
         for line in range(len(chat_buf)):
-            screen.addstr(line + 1, col, chat_buf[line])
+            screen.addstr(line + 3, col, chat_buf[line])
+
+        # print location and doors to top of screen
+        if location and doors:
+            screen.addstr(1, 1, f'Location: {location}  Doors: {" ".join(doors)}')
+        else:
+            screen.addstr(1, 1, f'Lobby')
 
         if mov_curs_flag:
             screen.addstr(max_height - 2, col, inpline + ' ')
