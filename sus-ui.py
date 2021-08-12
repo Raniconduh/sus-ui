@@ -166,8 +166,6 @@ def main(screen):
     row = 1
     col = 1
 
-    max_height, max_width = screen.getmaxyx()
-
     # set getch() to non-blocking
     screen.timeout(0)
 
@@ -182,9 +180,11 @@ def main(screen):
     player_type = None
     location = None
     doors = []
+    tasks = []
 
     # chat
     while True:
+        max_height, max_width = screen.getmaxyx()
         mov_curs_flag = False
         clear_flag = False
 
@@ -205,6 +205,8 @@ def main(screen):
                     game_play = True
                     new_com = {"type":"location"}
                     s.send(json.dumps(new_com).encode('utf-8'))
+                    new_com = {"type":"tasks"}
+                    s.send(json.dumps(new_com).encode('utf-8'))
             elif line["type"] == "player_type":
                 player_type = int(line["status"])
                 tmp_type = player_types[player_type]
@@ -214,24 +216,36 @@ def main(screen):
                 doors = [door for door in line["arguments"]["doors"]]
             elif line["type"] == "set_location":
                 pass
+            elif line["type"] == "tasks":
+                tasks = [task for task in line["arguments"]]
+            elif line["type"] == "do_task":
+                chat_buf.append('**Did task**')
             else:
                 chat_buf.append(f'**Unknown server response** [{line["type"]}]')
 
         # handle inputs
         if (c := screen.getch()) != -1 and not read_next:
             if c == ord('\n') and inpline.strip():
+                isplit = inpline.split(' ')
                 if inpline == '/start':
                     new_com = {"type":"command","arguments":{"command":"start","arguments":[]}}
                     s.send(json.dumps(new_com).encode('utf-8'))
                 elif inpline == '/location':
                     new_com = {"type":"location"}
                     s.send(json.dumps(new_com).encode('utf-8'))
-                elif inpline.split(' ')[0] == '/go' and len(inpline.split(' ')) == 2:
-                    i = inpline.split(' ')
-                    new_com = {"type":"set_location","arguments":{"name":i[1]}}
+                elif isplit[0] == '/go' and len(isplit) == 2:
+                    new_com = {"type":"set_location","arguments":{"name":isplit[1]}}
                     s.send(json.dumps(new_com).encode('utf-8'))
                     
                     new_com = {"type":"location"}
+                    s.send(json.dumps(new_com).encode('utf-8'))
+                elif inpline == "/tasks":
+                    new_com = {"type": "tasks"}
+                    s.send(json.dumps(new_com).encode('utf-8'))
+                elif isplit[0] == '/do' and len(isplit) > 1:
+                    new_com = {"type":"do_task","arguments":{"name":' '.join(isplit[1:]),"location":location}}
+                    s.send(json.dumps(new_com).encode('utf-8'))
+                    new_com = {"type":"tasks"}
                     s.send(json.dumps(new_com).encode('utf-8'))
                 elif not game_play:
                     new_msg = {"type":"message","arguments":{"message":inpline}}
@@ -271,6 +285,18 @@ def main(screen):
             screen.addstr(1, 1, f'Location: {location}  Doors: {" ".join(doors)}')
         else:
             screen.addstr(1, 1, f'Lobby')
+
+        # display tasks
+        if tasks:
+            screen.addstr(1, max_width - 45, "Tasks:")
+            for task in range(len(tasks)):
+                done = '-' if tasks[task]["done"] else ' '
+                taskd = tasks[task]["description"]
+                loc = tasks[task]["location"]
+                screen.addstr(task + 2, max_width - 45, f'[{done}] {taskd} in {loc}')
+        elif game_play:
+            new_com = {"type":"tasks"}
+            s.send(json.dumps(new_com).encode('utf-8'))
 
         if mov_curs_flag:
             screen.addstr(max_height - 2, col, inpline + ' ')
