@@ -5,20 +5,23 @@ import socket
 import json
 
 
+sock_closed = False
+
+
 # read all data in socket
 def readall(s):
-    s.settimeout(0.25)
     buf = ""
     try:
         while c := s.recv(1):
             try: buf += c.decode('utf-8')
             except UnicodeDecodeError: pass
-    except socket.timeout:
-        return buf
+    except BlockingIOError:
+        pass
+    return buf
 
 # read single line in socket
 def readline(s):
-    s.settimeout(0.005)
+    global sock_closed
     buf = ''
     try:
         while c := s.recv(1):
@@ -26,9 +29,10 @@ def readline(s):
                 return buf
             try: buf += c.decode('utf-8')
             except UnicodeDecodeError: pass
-    except socket.timeout:
+    except BlockingIOError:
         return None
-    screen.erase()
+    if not buf:
+        sock_closed = True
     return buf
 
 
@@ -127,6 +131,7 @@ def get_uname(screen):
 def main(screen):
     host, port = get_server_info(screen)
     s = connect_to_socket(screen, host, port)
+    s.setblocking(False)
 
     name = get_uname(screen)
 
@@ -182,6 +187,8 @@ def main(screen):
     doors = []
     tasks = []
 
+    global sock_closed
+
     # chat
     while True:
         max_height, max_width = screen.getmaxyx()
@@ -222,6 +229,9 @@ def main(screen):
                 chat_buf.append('**Did task**')
             else:
                 chat_buf.append(f'**Unknown server response** [{line["type"]}]')
+
+        if sock_closed:
+            return
 
         # handle inputs
         if (c := screen.getch()) != -1 and not read_next:
@@ -327,4 +337,7 @@ if __name__ == '__main__':
     curses.curs_set(1)
     curses.endwin()
 
+    if sock_closed:
+        print("Connection closed unexpectedly")
+        quit(1)
 
