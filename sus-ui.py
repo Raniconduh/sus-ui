@@ -142,19 +142,22 @@ def main(screen):
     nd = json.dumps(nd)
 
     s.send(nd.encode('utf-8'))
-
-    name_response = readall(s)
+    
+    name_response = readline(s)
+    while not name_response:
+        name_response = readline(s)
     name_response = json.loads(name_response)
 
     name_stauses = {
-            0: "Name Too Short",
-            1: "Name Too Long",
-            2: "Invalid Name",
-            3: "Name Taken"
+            0: "Success",
+            1: "Name Too Short",
+            2: "Name Too Long",
+            3: "Invalid Name",
+            4: "Name Taken"
     }
 
     # invalid name
-    while name_response["type"] != "greeting":
+    while name_response["status"]:
         screen.erase()
         screen.addstr(1, 1, name_stauses[name_response["status"]])
         screen.refresh()
@@ -163,8 +166,11 @@ def main(screen):
         name = get_uname(screen)
         nd = json.dumps({"type":"name", "arguments":{"name":name}})
         s.send(nd.encode('utf-8'))
-
-        name_response = json.loads(readall(s))
+        
+        name_response = readall(s)
+        while not name_response:
+            name_response = readall(s)
+        name_response = json.loads(name_response)
 
     chat_buf = []
 
@@ -201,12 +207,13 @@ def main(screen):
                 sender = line["arguments"]["player"]
                 msg = line["arguments"]["message"]
                 chat_buf.append(f'[{sender}]: {msg}')
-            elif line["type"] == "join":
-                player = line["arguments"]["player"]
-                chat_buf.append(f'[{player} joined the lobby]')
-            elif line["type"] == "leave":
-                player = line["arguments"]["player"]
-                chat_buf.append(f'[{player} left the lobby]')
+            elif line["type"] == "player_status":
+                if line["status"] == 0:
+                    player = line["arguments"]["player"]
+                    chat_buf.append(f'[{player} left the lobby]')
+                elif line["status"] == 1:
+                    player = line["arguments"]["player"]
+                    chat_buf.append(f'[{player} joined the lobby]')
             elif line["type"] == "game_status":
                 if line["status"] == 0:
                     game_play = True
@@ -225,8 +232,10 @@ def main(screen):
                 pass
             elif line["type"] == "tasks":
                 tasks = [task for task in line["arguments"]]
-            elif line["type"] == "do_task":
+            elif line["type"] == "do_task" and line["status"] == 0:
                 chat_buf.append('**Did task**')
+            elif line["type"] == "set_location" and line["status"] == 0:
+                location = line["arguments"]["name"]
             else:
                 chat_buf.append(f'**Unknown server response** [{line["type"]}]')
 
@@ -238,15 +247,15 @@ def main(screen):
             if c == ord('\n') and inpline.strip():
                 isplit = inpline.split(' ')
                 if inpline == '/start':
-                    new_com = {"type":"command","arguments":{"command":"start","arguments":[]}}
+                    new_com = {"type":"start_game"}
                     s.send(json.dumps(new_com).encode('utf-8'))
                 elif inpline == '/location':
                     new_com = {"type":"location"}
                     s.send(json.dumps(new_com).encode('utf-8'))
                 elif isplit[0] == '/go' and len(isplit) == 2:
                     new_com = {"type":"set_location","arguments":{"name":isplit[1]}}
-                    s.send(json.dumps(new_com).encode('utf-8'))
-                    
+                    s.send(f'{json.dumps(new_com)}\n'.encode('utf-8'))
+
                     new_com = {"type":"location"}
                     s.send(json.dumps(new_com).encode('utf-8'))
                 elif inpline == "/tasks":
@@ -254,9 +263,10 @@ def main(screen):
                     s.send(json.dumps(new_com).encode('utf-8'))
                 elif isplit[0] == '/do' and len(isplit) > 1:
                     new_com = {"type":"do_task","arguments":{"name":' '.join(isplit[1:]),"location":location}}
-                    s.send(json.dumps(new_com).encode('utf-8'))
-                    new_com = {"type":"tasks"}
-                    s.send(json.dumps(new_com).encode('utf-8'))
+                    s.send(f'{json.dumps(new_com)}\n'.encode('utf-8'))
+                    
+                    new_com = {"type": "tasks"}
+                    s.send(f'{json.dumps(new_com)}\n'.encode('utf-8'))
                 elif not game_play:
                     new_msg = {"type":"message","arguments":{"message":inpline}}
                     new_msg = json.dumps(new_msg)
@@ -295,7 +305,7 @@ def main(screen):
             screen.addstr(1, 1, f'Location: {location}  Doors: {" ".join(doors)}')
         else:
             screen.addstr(1, 1, f'Lobby')
-
+        
         # display tasks
         if tasks:
             screen.addstr(1, max_width - 45, "Tasks:")
