@@ -267,12 +267,15 @@ def main(screen):
                     
                     new_com = {"type": "tasks"}
                     s.send(f'{json.dumps(new_com)}\n'.encode('utf-8'))
+                elif inpline == "/quit":
+                    s.close()
+                    return
                 elif not game_play:
                     new_msg = {"type":"message","arguments":{"message":inpline}}
                     new_msg = json.dumps(new_msg)
                     s.send(new_msg.encode('utf-8'))
 
-                    chat_buf.append(f'[you]: {inpline}')
+                    chat_buf.append(f'<you>: {inpline}')
 
                 inpline = ""
                 clear_flag = True
@@ -289,7 +292,7 @@ def main(screen):
 
         if read_next: read_next -= 1
 
-        if len(chat_buf) == max_height - 3:
+        if len(chat_buf) == max_height - 4:
             chat_buf = chat_buf[1:]
             clear_flag = True
 
