@@ -1,6 +1,6 @@
 # sus-ui
 
-A client for [among-sus](https://github.com/Raniconduh/among-sus)
+A client for [among-foss](https://github.com/Raniconduh/among-foss)
 
 
 ## Usage
@@ -21,4 +21,5 @@ The top right corner will be your list of tasks. An empty box beside a task (`[ 
 * `/tasks`: Refresh current task information
 * `/go LOCATION`: Go to the room `LOCATION`
 * `/do TASK`: Attempt to complete the task `TASK`
+* `/quit`: Quit the game
 
