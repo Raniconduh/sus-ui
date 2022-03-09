@@ -252,8 +252,8 @@ def main(screen):
                 elif inpline == '/location':
                     new_com = {"type":"location"}
                     s.send(json.dumps(new_com).encode('utf-8'))
-                elif isplit[0] == '/go' and len(isplit) == 2:
-                    new_com = {"type":"set_location","arguments":{"name":isplit[1]}}
+                elif isplit[0] == '/go' and len(isplit) > 1:
+                    new_com = {"type":"set_location","arguments":{"name":' '.join(isplit[1:])}}
                     s.send(f'{json.dumps(new_com)}\n'.encode('utf-8'))
 
                     new_com = {"type":"location"}
