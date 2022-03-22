@@ -47,33 +47,15 @@ class SCode():
     GSTAT_IMPWIN  = 2 # imposter victory
     GSTAT_CREWWIN = 3 # crew victory
 
-
-sock_closed = False
-
-
-# read all data in socket
-def readall(s):
-    buf = ""
-    try:
-        while c := s.recv(1):
-            try: buf += c.decode('utf-8')
-            except UnicodeDecodeError: pass
-    except socket.timeout:
-        pass
-    return buf
-
 # read single line in socket
 def readline(s):
     global sock_closed
     buf = ''
-    try:
-        while c := s.recv(1):
-            if c == b'\n':
-                return buf
-            try: buf += c.decode('utf-8')
-            except UnicodeDecodeError: pass
-    except socket.timeout:
-        return None
+    while c := s.recv(1):
+        if c == b'\n':
+            return buf
+        try: buf += c.decode('utf-8')
+        except UnicodeDecodeError: pass
     if not buf:
         sock_closed = True
     return buf
@@ -179,6 +161,7 @@ class BlockHandler():
     location = ""
     role = -1
 
+    inpline = ""
     msg_buf = []
 
     game_playing = False
@@ -190,7 +173,7 @@ class BlockHandler():
         y, x = self.screen.getmaxyx()
 
         self.msg_box = self.screen.subwin(y - 2, x - 1, 1, 1)
-        self.inp_box = self.screen.subwin(1, x - 1, y - 1, 1)
+        self.inp_box = self.screen.subwin(1, x - 1, y - 2, 1)
 
         self.msg_box.erase()
         self.msg_box.refresh()
@@ -212,6 +195,8 @@ class BlockHandler():
         except Exception: return None
 
     def message(self, s): # print to message buffer
+        y, x = self.screen.getmaxyx()
+
         self.msg_buf.append(s)
         y, x = self.msg_box.getmaxyx()
         if len(self.msg_buf) == y:
@@ -221,9 +206,33 @@ class BlockHandler():
             self.msg_box.addstr(line, 1, self.msg_buf[line])
         self.msg_box.refresh()
 
-    # quit the game
-    def quit_game(self):
-        pass
+        # move cursor to previous pos
+        self.screen.move(y, 1 + len(self.inpline))
+        self.screen.refresh()
+        # redraw input line
+        self.inp_box.addstr(0, 0, self.inpline)
+        self.inp_box.refresh()
+
+    def command(self, com):
+        lsplit = com.split(' ')
+        # start game
+        if com == "/start":
+            pass
+        # go to room
+        elif lsplit[0] == "/go" and len(lsplit) > 1:
+            pass
+        # do task
+        elif lsplit[0] == "/do" and len(lsplit) > 1:
+            pass
+        # quit game
+        elif com == "/quit":
+            self.s.close()
+            return -1
+        elif not self.game_playing:
+            new_msg = {"type":JType.CHAT,"arguments":{"content":com}}
+            new_msg = json.dumps(new_msg)
+            self.s.send(new_msg.encode('utf-8'))
+            self.message(f'<you>: {com}')
 
     def socket_handler(self):
         while line := self.sock_getline():
@@ -277,7 +286,7 @@ class BlockHandler():
                 if "arguments" in line:
                     name = self.clients[line["arguments"]["id"]]
                     message = line["arguments"]["content"]
-                    self.message(f'[{name}]; {message}')
+                    self.message(f'[{name}]: {message}')
                 elif "status" in line and line["status"] != 0:
                     self.message("** Couldn't send chat **")
             # complete task - WIP
@@ -287,35 +296,52 @@ class BlockHandler():
                     #tasks.....
             else: self.message(f'** Unknown server response ({line}) **')
 
-    # TODO: change to single character input editing
-    # instead of using screen_getline
     def input_handler(self):
+        y, x = self.screen.getmaxyx()
+        self.screen.move(y - 2, 1)
+
         while True:
-            line = self.screen_getline()
-            lsplit = line.split(' ')
-            # start game
-            if line == "/start":
-                pass
-            # go to room
-            elif lsplit[0] == "/go" and len(lsplit) > 1:
-                pass
-            # do task
-            elif lsplit[0] == "/do" and len(lsplit) > 1:
-                pass
-            # quit game
-            elif line == "/quit":
-                self.s.close()
-                self.quit_game()
-            elif not self.game_playing:
-                new_msg = {"type":JType.CHAT,"arguments":{"content":line}}
-                new_msg = json.dumps(new_msg)
-                self.s.send(new_msg.encode('utf-8'))
-                self.message(f'<you>: {line}')
+            c = self.inp_box.getch()
+
+            if not c or c == -1: continue
+
+            if c == ord('\n'):
+                # exit if necessary: returns -1
+                if self.command(self.inpline) == -1: return
+                self.inpline = ''
+                self.inp_box.erase()
+
+                self.inp_box.refresh()
+            elif c == ord('\b'):
+                if not len(self.inpline): continue
+
+                self.inpline = self.inpline[:1]
+                self.inp_box.erase()
+                self.inp_box.addstr(0, 0, self.inpline)
+
+                self.inp_box.refresh()
+            elif c != ord('\033'): # not ESC
+                self.inpline += chr(c)
+
+                self.inp_box.erase()
+                self.inp_box.addstr(0, 0, self.inpline)
+                self.inp_box.refresh()
 
 
 def main(screen):
+    curses.curs_set(0)
+    curses.noecho()
+    curses.cbreak()
+
+    screen.clear()
+    screen.refresh()
+
     host, port = get_server_info(screen)
     s = connect_to_socket(screen, host, port)
+
+    # to be used later
+    welcome = readline(s)
+    if welcome: welcome = json.loads(welcome)
 
     name = get_uname(screen)
 
@@ -350,52 +376,28 @@ def main(screen):
             name_response = readline(s)
         name_response = json.loads(name_response)
 
-    chat_buf = []
-
-    row = 1
-    col = 1
-
-    inpline = ""
     screen.erase()
-    read_next = 0
-    game_play = False
-    CREW = (0)
-    IMP = (1)
-    GHOST = (2)
-    player_types = ("crewmate", "imposter", "ghost")
-    player_type = None
-    location = None
-    doors = []
-    tasks = []
-    clients = {}
-
-    global sock_closed
 
     handlers = BlockHandler(s, screen)
-    Thread(target=handlers.socket_handler).start()
-    Thread(target=handlers.input_handler).start()
+
+    # welcome!
+    if welcome:
+        handlers.message(f'Server verion \'{welcome["arguments"]["version"]}\'')
+    # need to request current clients
+    msg = json.dumps({"type":JType.CLIENTS})
+    s.send(msg.encode('utf-8'))
+
+    # start socket handler on separate thread
+    t = Thread(target=handlers.socket_handler)
+    t.daemon = True
+    t.start()
+    try:
+        # input handler can stay on main thread
+        handlers.input_handler()
+    except KeyboardInterrupt:
+        return # exit
 
 
 if __name__ == '__main__':
-    screen = curses.initscr()
-    curses.curs_set(0)
-    curses.noecho()
-    curses.cbreak()
-    
-    screen.clear()
-    screen.refresh()
-
-    try:
-        main(screen)
-    except KeyboardInterrupt:
-        pass
-
-    curses.nocbreak()
-    curses.echo()
-    curses.curs_set(1)
-    curses.endwin()
-
-    if sock_closed:
-        print("Connection closed unexpectedly")
-        quit(1)
+    curses.wrapper(main)
 
