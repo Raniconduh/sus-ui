@@ -164,6 +164,7 @@ class BlockHandler():
         self.doors = []
         self.location = ""
         self.role = -1
+        self.cur_task = ""
 
         self.inpline = ""
         self.msg_buf = []
@@ -235,6 +236,8 @@ class BlockHandler():
 
         self.update_tasks()
         self.update_loc()
+
+        self.message("The game has started")
     
     def update_tasks(self):
         self.task_box.erase()
@@ -267,10 +270,18 @@ class BlockHandler():
             self.s.send(com.encode('utf-8'))
         # go to room
         elif lsplit[0] == "/go" and len(lsplit) > 1:
-            pass
+            loc = ' '.join(lsplit[1:])
+            com = {"type":JType.LOCATION,"arguments":{"name":loc}}
+            com = json.dumps(com)
+            self.s.send(com.encode('utf-8'))
         # do task
         elif lsplit[0] == "/do" and len(lsplit) > 1:
-            pass
+            desc = ' '.join(lsplit[1:])
+            com = {"type":JType.TASK,"arguments":{"description":desc}}
+            com = json.dumps(com)
+            self.s.send(com.encode('utf-8'))
+
+            self.cur_task = desc
         # quit game
         elif com == "/quit":
             self.s.close()
@@ -307,6 +318,7 @@ class BlockHandler():
             # room info
             elif line["type"] == JType.ROOM_INFO:
                 self.location = line["arguments"]["name"]
+                self.doors = []
                 for door in line["arguments"]["doors"]:
                     self.doors.append(door)
                 for client in line["arguments"]["clients"]:
@@ -314,7 +326,7 @@ class BlockHandler():
                         # maybe show ID too
                         self.message(f'Body found: {self.clients[client["id"]]}')
                 self.update_loc()
-            # game state - might need to look at "state"
+            # game state
             elif line["type"] == JType.STATE:
                 if "role" in line["arguments"]:
                     self.role = line["arguments"]["role"]
@@ -324,13 +336,14 @@ class BlockHandler():
                     self.message(f'You are {r}')
                 if "state" in line["arguments"]:
                     if line["arguments"]["state"] == 2:
-                        self.message("The game has started")
                         self.start_game()
             # tasks
-            elif line["type"] == JType.TASKS:
+            elif line["type"] == JType.TASKS: 
+                self.tasks = []
                 for task in line["arguments"]:
                     task["done"] = False
                     self.tasks.append(task)
+                self.update_tasks()
             # command failed
             elif line["type"] == JType.COMMAND:
                 c = line["arguments"]["name"]
@@ -347,15 +360,23 @@ class BlockHandler():
                     self.message(f'[{name}]: {message}')
                 elif "status" in line and line["status"] != 0:
                     self.message("** Couldn't send chat **")
-            # complete task - WIP
+            # location
+            elif line["type"] == JType.LOCATION:
+                if line["status"] == SCode.GAME_WLOC:
+                    self.message("** Wrong location  **")
+                elif line["status"] != SCode.GEN_OK:
+                    self.message("** Bad location **")
+            # complete task
             elif line["type"] == JType.TASK:
                 if line["status"] == SCode.GEN_OK:
                     for task in range(len(self.tasks)):
-                        if self.tasks[task]["description"] == line["arguments"]["description"]:
+                        # add location check
+                        if self.tasks[task]["description"] == self.cur_task:
                             self.tasks[task]["done"] = True
                             self.update_tasks()
+                            self.cur_task = ""
                 else:
-                    self.message("** could not complete task **")
+                    self.message("** Could not complete task **")
             else: self.message(f'** Unknown server response ({line}) **')
 
     def input_handler(self):
@@ -451,7 +472,7 @@ def main(screen):
 
     # start socket handler on separate thread
     t = Thread(target=handlers.socket_handler)
-    t.setDaemon(True)
+    t.daemon = True
     t.start()
     try:
         # input handler can stay on main thread
