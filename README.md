@@ -17,8 +17,6 @@ The top right corner will be your list of tasks. An empty box beside a task (`[ 
 ## Commands
 
 * `/start`: Start the game (can only be run as admin)
-* `/location`: Refresh location information
-* `/tasks`: Refresh current task information
 * `/go LOCATION`: Go to the room `LOCATION`
 * `/do TASK`: Attempt to complete the task `TASK`
 * `/quit`: Quit the game
