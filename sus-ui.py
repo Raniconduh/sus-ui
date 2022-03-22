@@ -49,15 +49,12 @@ class SCode():
 
 # read single line in socket
 def readline(s):
-    global sock_closed
     buf = ''
     while c := s.recv(1):
         if c == b'\n':
             return buf
         try: buf += c.decode('utf-8')
         except UnicodeDecodeError: pass
-    if not buf:
-        sock_closed = True
     return buf
 
 
