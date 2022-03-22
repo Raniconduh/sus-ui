@@ -213,6 +213,13 @@ class BlockHandler():
         # redraw input line
         self.inp_box.addstr(0, 0, self.inpline)
         self.inp_box.refresh()
+
+	# takes pure dict
+	def send_pack(self, packet):
+		try: packet = json.dumps(packet)
+		except Exception: return 1
+		try: self.s.send(packet.encode('utf-8'))
+		except UnicodeEncodeError: return 2
     
     def start_game(self):
         y, x = self.screen.getmaxyx()
@@ -265,21 +272,15 @@ class BlockHandler():
         lsplit = com.split(' ')
         # start game
         if com == "/start":
-            com = {"type":JType.COMMAND,"arguments":{"name":"start_game"}}
-            com = json.dumps(com)
-            self.s.send(com.encode('utf-8'))
+            self.send_pack({"type":JType.COMMAND,"arguments":{"name":"start_game"}})
         # go to room
         elif lsplit[0] == "/go" and len(lsplit) > 1:
             loc = ' '.join(lsplit[1:])
-            com = {"type":JType.LOCATION,"arguments":{"name":loc}}
-            com = json.dumps(com)
-            self.s.send(com.encode('utf-8'))
+            self.send_pack({"type":JType.LOCATION,"arguments":{"name":loc}})
         # do task
         elif lsplit[0] == "/do" and len(lsplit) > 1:
             desc = ' '.join(lsplit[1:])
-            com = {"type":JType.TASK,"arguments":{"description":desc}}
-            com = json.dumps(com)
-            self.s.send(com.encode('utf-8'))
+            self.send_pack({"type":JType.TASK,"arguments":{"description":desc}})
 
             self.cur_task = desc
         # quit game
@@ -287,9 +288,7 @@ class BlockHandler():
             self.s.close()
             return -1
         elif not self.game_playing:
-            new_msg = {"type":JType.CHAT,"arguments":{"content":com}}
-            new_msg = json.dumps(new_msg)
-            self.s.send(new_msg.encode('utf-8'))
+            self.send_pack({"type":JType.CHAT,"arguments":{"content":com}})
             self.message(f'<you>: {com}')
 
     def socket_handler(self):
