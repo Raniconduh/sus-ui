@@ -154,21 +154,24 @@ def get_uname(screen):
 
 
 class BlockHandler():
-    # {id: "name", ...}
-    clients = {}
-    tasks = []
-    doors = []
-    location = ""
-    role = -1
-
-    inpline = ""
-    msg_buf = []
-
-    game_playing = False
-
     def __init__(self, sock, screen):
         self.s = sock
         self.screen = screen
+
+        # initialize empty variables
+        self.loc_box = None
+        self.task_box = None
+
+        self.clients = {}
+        self.tasks = []
+        self.doors = []
+        self.location = ""
+        self.role = -1
+
+        self.inpline = ""
+        self.msg_buf = []
+
+        self.game_playing = False
 
         y, x = self.screen.getmaxyx()
 
@@ -212,12 +215,59 @@ class BlockHandler():
         # redraw input line
         self.inp_box.addstr(0, 0, self.inpline)
         self.inp_box.refresh()
+    
+    def start_game(self):
+        y, x = self.screen.getmaxyx()
+
+        self.game_playing = True
+
+        self.msg_box.erase()
+        self.msg_box.refresh()
+
+        self.msg_box = self.screen.subwin(y - 5, x // 2 - 1, 4, 1)
+        self.msg_box.erase()
+        self.msg_box.refresh()
+
+        self.loc_box = self.screen.subwin(2, x - 1, 1, 1)
+        self.loc_box.erase()
+        self.loc_box.refresh()
+
+        self.task_box = self.screen.subwin(y - 5, x // 2 - 1, 4, x // 2 + 1)
+        self.task_box.erase()
+        self.task_box.refresh()
+
+        self.update_tasks()
+        self.update_loc()
+    
+    def update_tasks(self):
+        self.task_box.erase()
+        self.task_box.addstr(0, 0, "Tasks:")
+        for task in range(len(self.tasks)):
+            done = ' '
+            if self.tasks[task]["done"]: done = '-'
+            desc = self.tasks[task]["description"]
+            loc = self.tasks[task]["location"]
+            self.task_box.addstr(task + 1, 0, f'[{done}] {desc} @ {loc}')
+        self.task_box.refresh()
+    
+    # update location and doors
+    def update_loc(self):
+        self.loc_box.erase()
+        self.loc_box.addstr(0, 0, self.location)
+        c = 7
+        self.loc_box.addstr(1, 0, "Doors: ")
+        for door in self.doors:
+            self.loc_box.addstr(1, c, f'{door} ')
+            c += len(door) + 1
+        self.loc_box.refresh()
 
     def command(self, com):
         lsplit = com.split(' ')
         # start game
         if com == "/start":
-            pass
+            com = {"type":JType.COMMAND,"arguments":{"name":"start_game"}}
+            com = json.dumps(com)
+            self.s.send(com.encode('utf-8'))
         # go to room
         elif lsplit[0] == "/go" and len(lsplit) > 1:
             pass
@@ -237,9 +287,8 @@ class BlockHandler():
     def socket_handler(self):
         while line := self.sock_getline():
             line = json.loads(line)
-            # server info - WIP
-            if line["type"] == JType.S_INFO:
-                pass
+            # server info - noop
+            if line["type"] == JType.S_INFO: pass
             #client info - WIP
             elif line["type"] == JType.C_INFO:
                 if "name" in line["arguments"]: player = line["arguments"]["name"]
@@ -258,10 +307,17 @@ class BlockHandler():
             # game status - WIP
             elif line["type"] == JType.GAME_STATUS:
                 pass
-            # room info - WIP
+            # room info
             elif line["type"] == JType.ROOM_INFO:
-                pass
-            # game state - WIP
+                self.location = line["arguments"]["name"]
+                for door in line["arguments"]["doors"]:
+                    self.doors.append(door)
+                for client in line["arguments"]["clients"]:
+                    if not client["alive"]:
+                        # maybe show ID too
+                        self.message(f'Body found: {self.clients[client["id"]]}')
+                self.update_loc()
+            # game state - might need to look at "state"
             elif line["type"] == JType.STATE:
                 if "role" in line["arguments"]:
                     self.role = line["arguments"]["role"]
@@ -269,9 +325,14 @@ class BlockHandler():
                     if self.role == 0: r = "a crewmate"
                     elif self.role == 1: r = "an imposter"
                     self.message(f'You are {r}')
-            # tasks - WIP
+                if "state" in line["arguments"]:
+                    if line["arguments"]["state"] == 2:
+                        self.message("The game has started")
+                        self.start_game()
+            # tasks
             elif line["type"] == JType.TASKS:
                 for task in line["arguments"]:
+                    task["done"] = False
                     self.tasks.append(task)
             # command failed
             elif line["type"] == JType.COMMAND:
@@ -292,8 +353,12 @@ class BlockHandler():
             # complete task - WIP
             elif line["type"] == JType.TASK:
                 if line["status"] == SCode.GEN_OK:
-                    pass
-                    #tasks.....
+                    for task in range(len(self.tasks)):
+                        if self.tasks[task]["description"] == line["arguments"]["description"]:
+                            self.tasks[task]["done"] = True
+                            self.update_tasks()
+                else:
+                    self.message("** could not complete task **")
             else: self.message(f'** Unknown server response ({line}) **')
 
     def input_handler(self):
@@ -389,7 +454,7 @@ def main(screen):
 
     # start socket handler on separate thread
     t = Thread(target=handlers.socket_handler)
-    t.daemon = True
+    t.setDaemon(True)
     t.start()
     try:
         # input handler can stay on main thread
