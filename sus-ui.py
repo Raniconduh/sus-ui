@@ -394,10 +394,12 @@ class BlockHandler():
                 self.inp_box.erase()
 
                 self.inp_box.refresh()
-            elif c == ord('\b'):
+            elif c == ord('\b') or c == 127:
                 if not len(self.inpline): continue
+                if len(self.inpline) == 1:
+                    self.inpline = ""
 
-                self.inpline = self.inpline[:1]
+                self.inpline = self.inpline[:-1]
                 self.inp_box.erase()
                 self.inp_box.addstr(0, 0, self.inpline)
 
