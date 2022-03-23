@@ -214,12 +214,12 @@ class BlockHandler():
         self.inp_box.addstr(0, 0, self.inpline)
         self.inp_box.refresh()
 
-	# takes pure dict
-	def send_pack(self, packet):
-		try: packet = json.dumps(packet)
-		except Exception: return 1
-		try: self.s.send(packet.encode('utf-8'))
-		except UnicodeEncodeError: return 2
+    # takes pure dict
+    def send_pack(self, packet):
+        try: packet = json.dumps(packet)
+        except Exception: return 1
+        try: self.s.send(packet.encode('utf-8'))
+        except UnicodeEncodeError: return 2
     
     def start_game(self):
         y, x = self.screen.getmaxyx()
@@ -464,7 +464,7 @@ def main(screen):
 
     # welcome!
     if welcome:
-        handlers.message(f'Server verion \'{welcome["arguments"]["version"]}\'')
+        handlers.message(f'Server version \'{welcome["arguments"]["version"]}\'')
     # need to request current clients
     msg = json.dumps({"type":JType.CLIENTS})
     s.send(msg.encode('utf-8'))
