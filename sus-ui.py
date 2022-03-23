@@ -345,8 +345,8 @@ class BlockHandler():
                 self.update_tasks()
             # command failed
             elif line["type"] == JType.COMMAND:
-                c = line["arguments"]["name"]
-                self.message(f'** Could not run command ({c}) **')
+                if line["status"] != SCode.GEN_OK:
+                    self.message(f'** Could not run command **')
             # list clients
             elif line["type"] == JType.CLIENTS:
                 for client in line["arguments"]:
@@ -370,7 +370,8 @@ class BlockHandler():
                 if line["status"] == SCode.GEN_OK:
                     for task in range(len(self.tasks)):
                         # add location check
-                        if self.tasks[task]["description"] == self.cur_task:
+                        if self.tasks[task]["description"] == self.cur_task and \
+                        self.tasks[task]["location"].lower() == self.location.lower():
                             self.tasks[task]["done"] = True
                             self.update_tasks()
                             self.cur_task = ""
