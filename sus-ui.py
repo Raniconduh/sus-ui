@@ -14,14 +14,16 @@ class JType():
     ROOM_INFO = 3
     STATE     = 4     # client state
     TASKS     = 5     # tasks list
+    DATA      = 6
     # client -> server
-    COMMAND   = 6     # run command
-    NAME      = 7     # set name
-    LOCATION  = 8     # set location
+    COMMAND   = 7     # run command
+    NAME      = 8     # set name
+    LOCATION  = 9     # set location
+    KILL      = 10
     # client <-> server
-    CLIENTS   = 9     # request clients
-    CHAT      = 10    # send chat
-    TASK      = 11    # do task
+    CLIENTS   = 11     # request clients
+    CHAT      = 12    # send chat
+    TASK      = 13    # do task
 
 
 class SCode():
@@ -264,8 +266,8 @@ class BlockHandler():
         c = 7
         self.loc_box.addstr(1, 0, "Doors: ")
         for door in self.doors:
-            self.loc_box.addstr(1, c, f'{door} ')
-            c += len(door) + 1
+            self.loc_box.addstr(1, c, f'{door}  ')
+            c += len(door) + 2 # leave 2 spaces between each door
         self.loc_box.refresh()
 
     def command(self, com):
@@ -283,6 +285,9 @@ class BlockHandler():
             self.send_pack({"type":JType.TASK,"arguments":{"description":desc}})
 
             self.cur_task = desc
+        # refresh tasks
+        elif com == "/tasks":
+            self.send_pack({"type":JType.TASKS})
         # quit game
         elif com == "/quit":
             self.s.close()
@@ -343,6 +348,9 @@ class BlockHandler():
                     task["done"] = False
                     self.tasks.append(task)
                 self.update_tasks()
+            # initial game data - WIP
+            elif line["type"] == JType.DATA:
+                pass
             # command failed
             elif line["type"] == JType.COMMAND:
                 if line["status"] != SCode.GEN_OK:
