@@ -9,9 +9,9 @@ After starting the client (`likely via ./sus-ui.py`), enter the IP (or hostname)
 
 Now, unless a game is already started on the server, you will be put into the lobby. At this point, the client is usable as a basic chat app. Once ready, the server admin can start the game with the `/start` command. If the game can be started, each client will be told whether they are an imposter or crewmate and the game begins.
 
-The top left corner will look like so: `Location: Cafeteria  Doors: Admin`. `Location:` shows the current room you are in. `Doors:` shows the list of rooms that you can travel to. To travel to a different room, use the `/go` command. E.g. `/go Admin`.
+The top of the screen will show the current location (on the top line) and a list of doors that you are able to go to (on the line directly underneath). To go to a different room, the `/go` command can be used. E.g. `/go Admin`. (Case sensitive.)
 
-The top right corner will be your list of tasks. An empty box beside a task (`[  ]`) means it is not completed whereas a box with a hyphen (`[-]`) means it is completed. To do a task, go to the room specified. Then, complete it with `/do Task name`. E.g. if the task looks like `[  ] Swipe card in Admin`, first navigate to `Admin`. Then, `/do Swipe card`, omitting the location. Upon completion, the box will fill in and will appear as `[-] Swipe card in Admin`.
+If the player is a crewmate, the screen will be divided vertically into two parts. The left half of the screen will contain the message box. The right half will list the tasks you have to complete. An empty box beside a task (`[  ]`) means it is not completed whereas a box with a hyphen (`[-]`) means it is completed. To do a task, go to the room specified. Then, complete it with `/do Task name`. E.g. if the task looks like `[  ] Swipe card @ Admin`, first navigate to `Admin`. Then, `/do Swipe card`, omitting the location. Upon completion, the box will fill in and will appear as `[-] Swipe card @ Admin`.
 
 
 ## Commands
