@@ -161,12 +161,15 @@ class BlockHandler():
         self.loc_box = None
         self.task_box = None
 
+        # relate ID (index) to task and location
+        self.local_tasks = [] # [{"desc": "description", "loc": 0}, ...]
+        self.local_locs  = [] # ["Cafeteria", ...]
+        self.local_doors = [] # [[0, 1, 2], ...]
+
         self.clients = {}
         self.tasks = []
-        self.doors = []
-        self.location = ""
+        self.location = 0
         self.role = -1
-        self.cur_task = ""
 
         self.inpline = ""
         self.msg_buf = []
@@ -254,20 +257,20 @@ class BlockHandler():
         for task in range(len(self.tasks)):
             done = ' '
             if self.tasks[task]["done"]: done = '-'
-            desc = self.tasks[task]["description"]
-            loc = self.tasks[task]["location"]
+            desc = self.local_tasks[self.tasks[task]["id"]]["desc"]
+            loc = self.local_locs[self.local_tasks[self.tasks[task]["id"]]["loc"]]
             self.task_box.addstr(task + 1, 0, f'[{done}] {desc} @ {loc}')
         self.task_box.refresh()
     
     # update location and doors
     def update_loc(self):
         self.loc_box.erase()
-        self.loc_box.addstr(0, 0, self.location)
+        self.loc_box.addstr(0, 0, self.local_locs[self.location])
         c = 7
         self.loc_box.addstr(1, 0, "Doors: ")
-        for door in self.doors:
-            self.loc_box.addstr(1, c, f'{door}  ')
-            c += len(door) + 2 # leave 2 spaces between each door
+        for door in self.local_doors[self.location]:
+            self.loc_box.addstr(1, c, f'{self.local_locs[door]}  ')
+            c += len(self.local_locs[door]) + 2 # leave 2 spaces between each door
         self.loc_box.refresh()
 
     def command(self, com):
@@ -278,16 +281,21 @@ class BlockHandler():
         # go to room
         elif lsplit[0] == "/go" and len(lsplit) > 1:
             loc = ' '.join(lsplit[1:])
-            self.send_pack({"type":JType.LOCATION,"arguments":{"name":loc}})
+            if loc in self.local_locs:
+                loc = self.local_locs.index(loc)
+                self.send_pack({"type":JType.LOCATION,"arguments":{"id":loc}})
+            else:
+                self.message("** Bad location **")
         # do task
         elif lsplit[0] == "/do" and len(lsplit) > 1:
             desc = ' '.join(lsplit[1:])
-            self.send_pack({"type":JType.TASK,"arguments":{"description":desc}})
+            for task in range(len(self.local_tasks)):
+                if self.local_tasks[task]["desc"] == desc and self.local_tasks[task]["loc"] == self.location:
+                    self.send_pack({"type":JType.TASK,"arguments":{"id":task}})
 
-            self.cur_task = desc
         # refresh tasks
         elif com == "/tasks":
-            self.send_pack({"type":JType.TASKS})
+            self.update_tasks()
         # quit game
         elif com == "/quit":
             self.s.close()
@@ -321,10 +329,7 @@ class BlockHandler():
                 pass
             # room info
             elif line["type"] == JType.ROOM_INFO:
-                self.location = line["arguments"]["name"]
-                self.doors = []
-                for door in line["arguments"]["doors"]:
-                    self.doors.append(door)
+                self.location = line["arguments"]["id"]
                 for client in line["arguments"]["clients"]:
                     if not client["alive"]:
                         # maybe show ID too
@@ -338,19 +343,21 @@ class BlockHandler():
                     if self.role == 0: r = "a crewmate"
                     elif self.role == 1: r = "an imposter"
                     self.message(f'You are {r}')
-                if "state" in line["arguments"]:
-                    if line["arguments"]["state"] == 2:
+                if "stage" in line["arguments"]:
+                    if line["arguments"]["stage"] == 2:
                         self.start_game()
             # tasks
             elif line["type"] == JType.TASKS: 
                 self.tasks = []
-                for task in line["arguments"]:
-                    task["done"] = False
+                for t in line["arguments"]:
+                    task = {"id": t, "done": False}
                     self.tasks.append(task)
                 self.update_tasks()
-            # initial game data - WIP
+            # initial game data
             elif line["type"] == JType.DATA:
-                pass
+                self.local_tasks = [t for t in line["arguments"]["tasks"]]
+                self.local_doors = [d["doors"] for d in line["arguments"]["locations"]]
+                self.local_locs  = [n["name"] for n in line["arguments"]["locations"]]
             # command failed
             elif line["type"] == JType.COMMAND:
                 if line["status"] != SCode.GEN_OK:
@@ -376,13 +383,11 @@ class BlockHandler():
             # complete task
             elif line["type"] == JType.TASK:
                 if line["status"] == SCode.GEN_OK:
+                    self.message(repr(line))
                     for task in range(len(self.tasks)):
-                        # add location check
-                        if self.tasks[task]["description"] == self.cur_task and \
-                        self.tasks[task]["location"].lower() == self.location.lower():
+                        if self.tasks[task]["id"] == line["arguments"]["id"]:
                             self.tasks[task]["done"] = True
                             self.update_tasks()
-                            self.cur_task = ""
                 else:
                     self.message("** Could not complete task **")
             else: self.message(f'** Unknown server response ({line}) **')
