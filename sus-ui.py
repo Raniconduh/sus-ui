@@ -237,10 +237,6 @@ class BlockHandler():
         self.msg_box.erase()
         self.msg_box.refresh()
 
-        self.msg_box = self.screen.subwin(y - 6, x // 2 - 1, 5, 1)
-        self.msg_box.erase()
-        self.msg_box.refresh()
-
         self.loc_box = self.screen.subwin(2, x - 1, 1, 1)
         self.loc_box.erase()
         self.loc_box.refresh()
@@ -249,9 +245,17 @@ class BlockHandler():
         self.client_box.erase()
         self.client_box.refresh()
 
-        self.task_box = self.screen.subwin(y - 6, x // 2 - 1, 5, x // 2 + 1)
-        self.task_box.erase()
-        self.task_box.refresh()
+        if self.role == 0: # crewmate
+            self.msg_box = self.screen.subwin(y - 6, x // 2 - 1, 5, 1)
+
+            self.task_box = self.screen.subwin(y - 6, x // 2 - 1, 5, x // 2 + 1)
+            self.task_box.erase()
+            self.task_box.refresh()
+        elif self.role == 1: # imposter
+            self.msg_box = self.screen.subwin(y - 6, x - 1, 5, 1)
+
+        self.msg_box.erase()
+        self.msg_box.refresh()
 
         self.update_tasks()
         self.update_loc()
@@ -259,6 +263,7 @@ class BlockHandler():
         self.message("The game has started")
     
     def update_tasks(self):
+        if self.role == 1: return
         self.task_box.erase()
         self.task_box.addstr(0, 0, "Tasks:")
         for task in range(len(self.tasks)):
@@ -305,9 +310,13 @@ class BlockHandler():
         # do task
         elif lsplit[0] == "/do" and len(lsplit) > 1:
             desc = ' '.join(lsplit[1:])
+            attempt = False
             for task in range(len(self.local_tasks)):
                 if self.local_tasks[task]["desc"] == desc and self.local_tasks[task]["loc"] == self.location:
+                    attempt = True
                     self.send_pack({"type":JType.TASK,"arguments":{"id":task}})
+            if not attempt:
+                self.message("** Invalid Task **")
         # kill player
         elif lsplit[0] == "/kill":
             name = ' '.join(lsplit[1:])
@@ -338,7 +347,7 @@ class BlockHandler():
             line = json.loads(line)
             # server info - noop
             if line["type"] == JType.S_INFO: pass
-            #client info - WIP
+            # client info - WIP
             elif line["type"] == JType.C_INFO:
                 if "name" in line["arguments"]: player = line["arguments"]["name"]
                 else: player = None
@@ -353,16 +362,19 @@ class BlockHandler():
                     self.message(f'[{self.clients[p_id]} entered the room]')
                 elif line["status"] == SCode.CLI_RLEAVE:
                     self.message(f'[{self.clients[p_id]} left the room]')
-            # game status - WIP
+            # game status
             elif line["type"] == JType.GAME_STATUS:
-                pass
+                if "arguments" in line and "winner" in line["arguments"]:
+                    if line["arguments"]["winner"] == 0:
+                        self.message("Crewmates Win!")
+                    elif line["arguments"]["winner"] == 1:
+                        self.message("Imposters Win!")
             # room info
             elif line["type"] == JType.ROOM_INFO:
                 self.location = line["arguments"]["id"]
                 ir_clients = []
                 for client in line["arguments"]["clients"]:
                     if not client["alive"]:
-                        # maybe show ID too
                         self.message(f'Body found: {self.clients[client["id"]]}')
                     else:
                         ir_clients.append(client["id"])
