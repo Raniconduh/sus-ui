@@ -193,13 +193,6 @@ class BlockHandler():
         try: return line.decode('utf-8')
         except Exception: return None
 
-    def screen_getline(self): # read line of user input
-        line = self.inp_box.getstr(0, 0)
-        self.inp_box.erase()
-        self.inp_box.refresh()
-        try: return line.decode('utf-8')
-        except Exception: return None
-
     def message(self, s): # print to message buffer
         y, x = self.screen.getmaxyx()
 
