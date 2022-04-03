@@ -220,9 +220,12 @@ class BlockHandler():
         self.inp_box.refresh()
 
     # takes pure dict
-    def send_pack(self, packet):
-        try: packet = json.dumps(packet)
-        except Exception: return 1
+    def send_pack(self, packet, raw=None):
+        if packet and not raw:
+            try: packet = json.dumps(packet)
+            except Exception: return 1
+        elif raw:
+            packet = raw
         try: self.s.send(packet.encode('utf-8'))
         except UnicodeEncodeError: return 2
     
@@ -234,7 +237,7 @@ class BlockHandler():
         self.msg_box.erase()
         self.msg_box.refresh()
 
-        self.msg_box = self.screen.subwin(y - 5, x // 2 - 1, 4, 1)
+        self.msg_box = self.screen.subwin(y - 6, x // 2 - 1, 5, 1)
         self.msg_box.erase()
         self.msg_box.refresh()
 
@@ -242,7 +245,11 @@ class BlockHandler():
         self.loc_box.erase()
         self.loc_box.refresh()
 
-        self.task_box = self.screen.subwin(y - 5, x // 2 - 1, 4, x // 2 + 1)
+        self.client_box = self.screen.subwin(1, x - 1, 3, 1)
+        self.client_box.erase()
+        self.client_box.refresh()
+
+        self.task_box = self.screen.subwin(y - 6, x // 2 - 1, 5, x // 2 + 1)
         self.task_box.erase()
         self.task_box.refresh()
 
@@ -273,6 +280,15 @@ class BlockHandler():
             c += len(self.local_locs[door]) + 2 # leave 2 spaces between each door
         self.loc_box.refresh()
 
+    def update_ir_clients(self, ir_clients):
+        self.client_box.erase()
+        c = 6
+        self.client_box.addstr(0, 0, "Room: ")
+        for client in ir_clients:
+            self.client_box.addstr(0, c, self.clients[client])
+            c += len(self.clients[client]) + 2
+        self.client_box.refresh()
+
     def command(self, com):
         lsplit = com.split(' ')
         # start game
@@ -292,7 +308,20 @@ class BlockHandler():
             for task in range(len(self.local_tasks)):
                 if self.local_tasks[task]["desc"] == desc and self.local_tasks[task]["loc"] == self.location:
                     self.send_pack({"type":JType.TASK,"arguments":{"id":task}})
-
+        # kill player
+        elif lsplit[0] == "/kill":
+            name = ' '.join(lsplit[1:])
+            attempt = False
+            for k, v in self.clients.items():
+                if v == name:
+                    attempt = True
+                    self.send_pack({"type":JType.KILL,"arguments":{"id":k}})
+            if not attempt:
+                self.message("** Invalid Player **")
+        # raw command
+        elif lsplit[0] == "/raw":
+            com = ' '.join(lsplit[1:])
+            self.send_pack(None, raw=com)
         # refresh tasks
         elif com == "/tasks":
             self.update_tasks()
@@ -330,10 +359,14 @@ class BlockHandler():
             # room info
             elif line["type"] == JType.ROOM_INFO:
                 self.location = line["arguments"]["id"]
+                ir_clients = []
                 for client in line["arguments"]["clients"]:
                     if not client["alive"]:
                         # maybe show ID too
                         self.message(f'Body found: {self.clients[client["id"]]}')
+                    else:
+                        ir_clients.append(client["id"])
+                self.update_ir_clients(ir_clients)
                 self.update_loc()
             # game state
             elif line["type"] == JType.STATE:
@@ -383,7 +416,6 @@ class BlockHandler():
             # complete task
             elif line["type"] == JType.TASK:
                 if line["status"] == SCode.GEN_OK:
-                    self.message(repr(line))
                     for task in range(len(self.tasks)):
                         if self.tasks[task]["id"] == line["arguments"]["id"]:
                             self.tasks[task]["done"] = True
