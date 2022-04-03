@@ -167,6 +167,7 @@ class BlockHandler():
         self.local_doors = [] # [[0, 1, 2], ...]
 
         self.clients = {}
+        self.room_clients = []
         self.tasks = []
         self.location = 0
         self.role = -1
@@ -278,11 +279,11 @@ class BlockHandler():
             c += len(self.local_locs[door]) + 2 # leave 2 spaces between each door
         self.loc_box.refresh()
 
-    def update_ir_clients(self, ir_clients):
+    def update_ir_clients(self):
         self.client_box.erase()
         c = 6
         self.client_box.addstr(0, 0, "Room: ")
-        for client in ir_clients:
+        for client in self.room_clients:
             self.client_box.addstr(0, c, self.clients[client])
             c += len(self.clients[client]) + 2
         self.client_box.refresh()
@@ -352,9 +353,13 @@ class BlockHandler():
                     del self.clients[p_id]
                     self.message(f'[{player} left the game]')
                 elif line["status"] == SCode.CLI_RENTER:
+                    self.room_clients.append(p_id)
                     self.message(f'[{self.clients[p_id]} entered the room]')
+                    self.update_ir_clients()
                 elif line["status"] == SCode.CLI_RLEAVE:
+                    del self.room_clients[self.room_clients.index(p_id)]
                     self.message(f'[{self.clients[p_id]} left the room]')
+                    self.update_ir_clients()
             # game status
             elif line["type"] == JType.GAME_STATUS:
                 if "arguments" in line and "winner" in line["arguments"]:
@@ -365,13 +370,13 @@ class BlockHandler():
             # room info
             elif line["type"] == JType.ROOM_INFO:
                 self.location = line["arguments"]["id"]
-                ir_clients = []
+                self.room_clients = []
                 for client in line["arguments"]["clients"]:
                     if not client["alive"]:
                         self.message(f'Body found: {self.clients[client["id"]]}')
                     else:
-                        ir_clients.append(client["id"])
-                self.update_ir_clients(ir_clients)
+                        self.room_clients.append(client["id"])
+                self.update_ir_clients()
                 self.update_loc()
             # game state
             elif line["type"] == JType.STATE:
