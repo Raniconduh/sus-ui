@@ -213,6 +213,9 @@ class BlockHandler():
         self.inp_box.addstr(0, 0, self.inpline)
         self.inp_box.refresh()
 
+    def serr(self, s):
+        self.message(f"** {s} **")
+
     # takes pure dict
     def send_pack(self, packet, raw=None):
         if packet and not raw:
@@ -300,7 +303,7 @@ class BlockHandler():
                 loc = self.local_locs.index(loc)
                 self.send_pack({"type":JType.LOCATION,"arguments":{"id":loc}})
             else:
-                self.message("** Bad location **")
+                self.serr("Bad location")
         # do task
         elif lsplit[0] == "/do" and len(lsplit) > 1:
             desc = ' '.join(lsplit[1:])
@@ -310,7 +313,7 @@ class BlockHandler():
                     attempt = True
                     self.send_pack({"type":JType.TASK,"arguments":{"id":task}})
             if not attempt:
-                self.message("** Invalid Task **")
+                self.serr("Invalid task")
         # kill player
         elif lsplit[0] == "/kill":
             name = ' '.join(lsplit[1:])
@@ -320,7 +323,7 @@ class BlockHandler():
                     attempt = True
                     self.send_pack({"type":JType.KILL,"arguments":{"id":k}})
             if not attempt:
-                self.message("** Invalid Player **")
+                self.serr("Invalid player")
         # raw command
         elif lsplit[0] == "/raw":
             com = ' '.join(lsplit[1:])
@@ -404,7 +407,7 @@ class BlockHandler():
             # command failed
             elif line["type"] == JType.COMMAND:
                 if line["status"] != SCode.GEN_OK:
-                    self.message(f'** Could not run command **')
+                    self.serr("Could not run command")
             # list clients
             elif line["type"] == JType.CLIENTS:
                 for client in line["arguments"]:
@@ -416,13 +419,13 @@ class BlockHandler():
                     message = line["arguments"]["content"]
                     self.message(f'[{name}]: {message}')
                 elif "status" in line and line["status"] != 0:
-                    self.message("** Couldn't send chat **")
+                    self.serr("Could not send chat")
             # location
             elif line["type"] == JType.LOCATION:
                 if line["status"] == SCode.GAME_WLOC:
-                    self.message("** Wrong location  **")
+                    self.serr("Wrong location")
                 elif line["status"] != SCode.GEN_OK:
-                    self.message("** Bad location **")
+                    self.serr("Bad location")
             # complete task
             elif line["type"] == JType.TASK:
                 if line["status"] == SCode.GEN_OK:
@@ -431,8 +434,8 @@ class BlockHandler():
                             self.tasks[task]["done"] = True
                             self.update_tasks()
                 else:
-                    self.message("** Could not complete task **")
-            else: self.message(f'** Unknown server response ({line}) **')
+                    self.serr("Could not complete task")
+            else: self.serr(f'Unknown server response ({line})')
 
     def input_handler(self):
         y, x = self.screen.getmaxyx()
