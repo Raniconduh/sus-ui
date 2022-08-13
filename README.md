@@ -1,6 +1,6 @@
 # sus-ui
 
-A client for [among-foss](https://github.com/Raniconduh/among-foss)
+A client for [among-foss](https://github.com/f1nniboy/among-foss)
 
 
 ## Usage
